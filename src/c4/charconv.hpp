@@ -114,6 +114,11 @@ inline constexpr std::chars_format to_std_fmt(RealFormat_e f)
 #endif // C4CORE_HAVE_STD_TOCHARS
 
 
+// generic versions
+template<class T> bool atox(csubstr s, T *v);
+template<class T> size_t xtoa(substr s, T v);
+
+
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -825,6 +830,35 @@ inline size_t atod_first(csubstr str, double * C4_RESTRICT v)
     if(atod(trimmed, v)) return trimmed.end() - str.begin();
     return csubstr::npos;
 }
+
+
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+
+// generic versions
+C4_ALWAYS_INLINE bool atox(csubstr s,  uint8_t *v) { return atou(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,   int8_t *v) { return atoi(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s, uint16_t *v) { return atou(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,  int16_t *v) { return atoi(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s, uint32_t *v) { return atou(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,  int32_t *v) { return atoi(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s, uint64_t *v) { return atou(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,  int64_t *v) { return atoi(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,    float *v) { return atof(s, v); }
+C4_ALWAYS_INLINE bool atox(csubstr s,   double *v) { return atod(s, v); }
+
+C4_ALWAYS_INLINE size_t xtoa(substr s,  uint8_t v) { return utoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,   int8_t v) { return itoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s, uint16_t v) { return utoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,  int16_t v) { return itoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s, uint32_t v) { return utoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,  int32_t v) { return itoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s, uint64_t v) { return utoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,  int64_t v) { return itoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,    float v) { return ftoa(s, v); }
+C4_ALWAYS_INLINE size_t xtoa(substr s,   double v) { return dtoa(s, v); }
 
 
 //-----------------------------------------------------------------------------
