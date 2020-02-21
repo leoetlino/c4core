@@ -272,6 +272,55 @@ size_t utoa(substr buf, T v, T radix)
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
 
+namespace detail {
+
+// TODO truncate to the length of max I
+
+template<class I>
+C4_ALWAYS_INLINE bool read_dec(csubstr s, I *C4_RESTRICT v)
+{
+    C4_STATIC_ASSERT(std::is_integral<I>::value);
+    *v = 0;
+    for(char c : s)
+    {
+        if(c < '0' || c > '9') return false;
+        *v = (*v) * I(10) + (I(c) - I('0'));
+    }
+    return true;
+}
+
+template<class I>
+C4_ALWAYS_INLINE bool read_hex(csubstr s, I *C4_RESTRICT v)
+{
+    C4_STATIC_ASSERT(std::is_integral<I>::value);
+    *v = 0;
+    for(char c : s)
+    {
+        I cv;
+        if(c >= '0' && c <= '9') cv = I(c) - I('0');
+        else if(c >= 'a' && c <= 'f') cv = I(10) + (I(c) - I('a'));
+        else if(c >= 'A' && c <= 'F') cv = I(10) + (I(c) - I('A'));
+        else return false;
+        *v = (*v) * I(16) + cv;
+    }
+    return true;
+}
+
+template<class I>
+C4_ALWAYS_INLINE bool read_oct(csubstr s, I *C4_RESTRICT v)
+{
+    C4_STATIC_ASSERT(std::is_integral<I>::value);
+    *v = 0;
+    for(char c : s)
+    {
+        if(c < '0' || c > '7') return false;
+        *v = (*v) * I(8) + (I(c) - I('0'));
+    }
+    return true;
+}
+
+} // namespace detail
+
 
 /** Convert a trimmed string to a signed integral value. The value can be
  * formatted as decimal, binary (prefix 0b), octal (prefix 0)
@@ -290,7 +339,6 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
     C4_ASSERT(str.len > 0);
     C4_ASSERT(str == str.first_int_span());
 
-    T n = 0;
     T sign = 1;
     size_t start = 0;
     if(str[0] == '-')
@@ -301,12 +349,7 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
 
     if(str.str[start] != '0')
     {
-        for(size_t i = start; i < str.len; ++i)
-        {
-            char c = str.str[i];
-            if(c < '0' || c > '9') return false;
-            n = n*T(10) + (T(c)-T('0'));
-        }
+        if(C4_UNLIKELY( ! detail::read_dec(str.sub(start), v))) return false;
     }
     else
     {
@@ -319,30 +362,17 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
         else if(str.str[start+1] == 'x' || str.str[start+1] == 'X') // hexadecimal
         {
             C4_ASSERT(str.len > 2);
-            start += 2;
-            for(size_t i = start; i < str.len; ++i)
-            {
-                char c = str.str[i];
-                T cv;
-                if(c >= '0' && c <= '9') cv = T(c) - T('0');
-                else if(c >= 'a' && c <= 'f') cv = T(10) + (T(c)-T('a'));
-                else if(c >= 'A' && c <= 'F') cv = T(10) + (T(c)-T('A'));
-                else return false;
-                n = n*T(16) + cv;
-            }
+             if(C4_UNLIKELY( ! detail::read_hex(str.sub(start + 2), v))) return false;
         }
         else // octal
         {
             C4_ASSERT(str.len > 1);
-            for(size_t i = start; i < str.len; ++i)
-            {
-                char c = str.str[i];
-                if(c < '0' || c > '7') return false;
-                n = n*T(8) + (T(c)-T('0'));
-            }
+            if(C4_UNLIKELY( ! detail::read_oct(str.sub(start), v))) return false;
         }
     }
-    *v = sign * n;
+
+    *v *= sign;
+
     return true;
 }
 
@@ -382,17 +412,9 @@ bool atou(csubstr str, T * C4_RESTRICT v)
     C4_ASSERT(str.len > 0);
     C4_ASSERT_MSG(str.str[0] != '-', "must be positive");
     C4_ASSERT(str == str.first_uint_span());
-
-    T n = 0;
-
     if(str.str[0] != '0')
     {
-        for(size_t i = 0; i < str.len; ++i)
-        {
-            char c = str.str[i];
-            if(c < '0' || c > '9') return false;
-            n = n*T(10) + (T(c)-T('0'));
-        }
+        if(C4_UNLIKELY( ! detail::read_dec(str, v))) return false;
     }
     else
     {
@@ -404,29 +426,14 @@ bool atou(csubstr str, T * C4_RESTRICT v)
         else if(str.str[1] == 'x' || str.str[1] == 'X') // hexadecimal
         {
             C4_ASSERT(str.len > 2);
-            for(size_t i = 2; i < str.len; ++i)
-            {
-                char c = str.str[i];
-                T cv;
-                if(c >= '0' && c <= '9') cv = T(c) - T('0');
-                else if(c >= 'a' && c <= 'f') cv = T(10) + (T(c)-T('a'));
-                else if(c >= 'A' && c <= 'F') cv = T(10) + (T(c)-T('A'));
-                else return false;
-                n = n*T(16) + cv;
-            }
+            if(C4_UNLIKELY( ! detail::read_hex(str.sub(2), v))) return false;
         }
         else // octal
         {
             C4_ASSERT(str.len > 1);
-            for(size_t i = 1; i < str.len; ++i)
-            {
-                char c = str.str[i];
-                if(c < '0' || c > '7') return false;
-                n = n*T(8) + (T(c)-T('0'));
-            }
+            if(C4_UNLIKELY( ! detail::read_oct(str.sub(1), v))) return false;
         }
     }
-    *v = n;
     return true;
 }
 
@@ -518,16 +525,65 @@ size_t print_one(substr str, const char* full_fmt, T v)
 #endif
 }
 
+
 template<class T> struct real_buf;
-template<> struct real_buf<float> { using type = uint32_t; };
-template<> struct real_buf<double> { using type = uint64_t; };
+template<> struct real_buf<float> { using type = uint32_t; using stype = int32_t; };
+template<> struct real_buf<double> { using type = uint64_t; using stype = int64_t; };
+
 
 template<class T>
-struct real_type_info
+struct real
 {
     C4_STATIC_ASSERT(std::is_floating_point<T>::value);
     using itype = typename real_buf<T>::type;
-    itype buf = {};
+    using stype = typename real_buf<T>::type;
+
+    itype buf;
+
+    real() : buf() {}
+    explicit real(T val) : buf() { set(val); }
+
+    C4_ALWAYS_INLINE void set(T val) { buf = reinterpret_cast<itype const&>(val); }
+    C4_ALWAYS_INLINE T get() const { return reinterpret_cast<T const&>(buf); }
+
+    C4_ALWAYS_INLINE itype get_sign() const { return (buf & sign_mask) >> sign_bit; }
+    C4_ALWAYS_INLINE itype get_exp()  const { return (buf & exp_mask) >> exp_start; }
+    C4_ALWAYS_INLINE itype get_frac() const { return (buf & frac_mask) >> frac_start; }
+
+    C4_ALWAYS_INLINE T as_real() const { return get_sign_r() * get_exp_r() * get_frac_r(); }
+    C4_ALWAYS_INLINE T get_sign_r() const { return get_sign() ? T(-1) : T(1); }
+    C4_ALWAYS_INLINE T get_exp_r() const { return T(one << (get_exp() - exp_bias)); }
+    C4_ALWAYS_INLINE T get_frac_r() const
+    {
+        T out = 1, exp = 1;
+        itype frac = get_frac();
+        for(int i = 0; i < num_frac_bits; ++i)
+        {
+            exp /= T(2);
+            out += ((frac >> (num_frac_bits - i)) & one) * exp;
+        }
+        return out;
+    }
+
+    C4_ALWAYS_INLINE void set_sign() { buf |= sign_mask; } //!< to negative
+    C4_ALWAYS_INLINE void clr_sign() { buf &= ~sign_mask; } //!< to positive
+
+    C4_ALWAYS_INLINE void set_frac(itype f) { buf |= (f << frac_start) & frac_mask; }
+    C4_ALWAYS_INLINE void clr_frac(itype f) { buf &= ~frac_mask; }
+
+    C4_ALWAYS_INLINE void set_exp(itype f) { buf |= (f << exp_start) & exp_mask; }
+    C4_ALWAYS_INLINE void clr_exp(itype f) { buf &= ~exp_mask; }
+
+    C4_ALWAYS_INLINE T set(itype integral, itype fractional, itype exponent)
+    {
+        // TODO handle overflows
+        itype b = msb(integral); // Most Significant Bit
+        if(b) --b; // always an implicit 1 as the integral part
+        set_exp(exponent + b);
+        itype f = (integral << b);
+        set_frac(f);
+        return get();
+    }
 
     constexpr static inline int get_exponent_bits()
     {
@@ -556,9 +612,12 @@ struct real_type_info
     };
     enum : itype {
         one = 1,
+        sign_mask = one << sign_bit,
         frac_mask = get_mask(frac_start, frac_end),
         exp_mask = get_mask(exp_start, exp_end),
+        exp_bias = ((one << (num_exp_bits + 1)) - 1),
     };
+
 };
 
 template<class T>
@@ -567,15 +626,14 @@ inline size_t scan_one_real(csubstr str, T *v)
     C4_STATIC_ASSERT(std::is_floating_point<T>::value);
     C4_ASSERT(str.len > 0);
     C4_ASSERT(str == str.first_real_span());
-
-    using rtype = real_type_info<T>;
-    using itype = typename real_type_info<T>::itype;
+    using rtype = typename real<T>;
+    using itype = typename real<T>::itype;
 
     size_t pos = 0; // the current buffer position
-    rtype r; // the result, initialized to zero
+    real<T> r; // the result, initialized to zero
     if(str[0] == '-')
     {
-        r.buf |= (rtype::one << rtype::sign_bit);
+        r.set_sign();
         ++pos;
     }
     else if(str[0] == '+')
@@ -583,6 +641,7 @@ inline size_t scan_one_real(csubstr str, T *v)
         // no need to clear the sign bit
         ++pos; // other than counting the position
     }
+    C4_ASSERT(str.len > 1);
 
     if(str.str[pos] == '0')
     {
@@ -596,39 +655,58 @@ inline size_t scan_one_real(csubstr str, T *v)
         {   // hexadecimal
             C4_ASSERT(str.len > 2);
             pos += 2;
+            C4_NOT_IMPLEMENTED();
             return pos;
         }
-        while(str.str[++pos] == '0') {;} // skip leading zeroes
-        if(str.len == pos+1)
+    }
+
+    // read decimal
+    csubstr rem = str.trimr(" \t\r\n");
+    size_t dot_pos = rem.first_of('.');
+    size_t exp_pos = rem.first_of("eE", dot_pos != csubstr::npos ? dot_pos : 0);
+    itype integral_v, fractional_v, exponent_v;
+    C4_CHECK(detail::read_dec<itype>(str.range(pos, dot_pos != csubstr::npos ? dot_pos : exp_pos), &integral_v));
+    C4_CHECK(rem.end() >= str.begin());
+    pos = rem.end() - str.begin();
+
+    if(dot_pos != csubstr::npos)
+    {
+        C4_CHECK(detail::read_dec<itype>(rem.range(dot_pos+1, exp_pos), &fractional_v));
+    }
+    else
+    {
+        fractional_v = 0;
+    }
+
+    if(exp_pos != csubstr::npos)
+    {
+        const char exp_front = rem.right_of(exp_pos).front();
+        if(exp_front == '-')
         {
-            *v = T(0);
-            return pos+1;
+            ++exp_pos;
+            C4_CHECK(detail::read_dec<itype>(rem.right_of(exp_pos), &exponent_v));
+            exponent_v = rtype::exp_bias - exponent_v;
+        }
+        else
+        {
+            if(exp_front == '+') ++exp_pos;
+            C4_CHECK(detail::read_dec<itype>(rem.right_of(exp_pos), &exponent_v));
+            exponent_v = rtype::exp_bias + exponent_v;
         }
     }
-
-    csubstr rem = str.sub(pos);
-    size_t exp_pos = rem.first_of_any("e", "E").pos;
-    csubstr exponent = rem.right_of(exp_pos);
-    csubstr mantissa = rem.left_of(exp_pos);
-    size_t dot_pos = mantissa.first_of('.');
-    csubstr integral = mantissa.left_of(dot_pos);
-    csubstr fractional = mantissa.right_of(dot_pos);
-
-    itype integral_v = 0;
-    itype fractional_v = 0;
-    itype exponent_v = 0;
-    for(char c : integral)
+    else
     {
-        C4_ASSERT(c >= '0' && c <= '9');
-        integral_v = integral_v * itype(10) + (itype(c) - itype('0'));
-    }
-    for(char c : fractional)
-    {
-        C4_ASSERT(c >= '0' && c <= '9');
-        fractional_v = fractional_v * itype(10) + (itype(c) - itype('0'));
+        exponent_v = 0;
     }
 
-    C4_NOT_IMPLEMENTED();
+    if(integral_v == 0 && fractional_v == 0)
+    {
+        *v = T(0);
+        return pos;
+    }
+
+    *v = r.set(integral_v, fractional_v, exponent_v);
+
     return pos;
 }
 
