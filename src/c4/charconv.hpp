@@ -140,7 +140,15 @@ size_t itoa(substr buf, T v)
     C4_STATIC_ASSERT(std::is_integral<T>::value);
     C4_STATIC_ASSERT(std::is_signed<T>::value);
     size_t pos = 0;
-    if(v < 0)
+    if(v >= 0)
+    {
+        do {
+            _c4append('0' + (v % 10));
+            v /= 10;
+        } while(v);
+        buf.reverse_range(0, pos <= buf.len ? pos : buf.len);
+    }
+    else
     {
         _c4append('-');
         do {
@@ -151,14 +159,6 @@ size_t itoa(substr buf, T v)
         {
             buf.reverse_range(1, pos <= buf.len ? pos : buf.len);
         }
-    }
-    else
-    {
-        do {
-            _c4append('0' + (v % 10));
-            v /= 10;
-        } while(v);
-        buf.reverse_range(0, pos <= buf.len ? pos : buf.len);
     }
     return pos;
 }
@@ -191,7 +191,7 @@ size_t itoa(substr buf, T v, T radix)
     switch(radix)
     {
     case 2 : _c4append('0'); _c4append('b'); break;
-    case 8 : _c4append('0');                 break;
+    case 8 : _c4append('0'); _c4append('o'); break;
     case 16: _c4append('0'); _c4append('x'); break;
     }
 
@@ -249,7 +249,7 @@ size_t utoa(substr buf, T v, T radix)
     switch(radix)
     {
     case 2 : _c4append('0'); _c4append('b'); break;
-    case 8 : _c4append('0');                 break;
+    case 8 : _c4append('0'); _c4append('o'); break;
     case 16: _c4append('0'); _c4append('x'); break;
     }
 
@@ -283,7 +283,7 @@ C4_ALWAYS_INLINE bool read_dec(csubstr s, I *C4_RESTRICT v)
     *v = 0;
     for(char c : s)
     {
-        if(c < '0' || c > '9') return false;
+        if(C4_UNLIKELY(c < '0' || c > '9')) return false;
         *v = (*v) * I(10) + (I(c) - I('0'));
     }
     return true;
@@ -307,13 +307,28 @@ C4_ALWAYS_INLINE bool read_hex(csubstr s, I *C4_RESTRICT v)
 }
 
 template<class I>
+C4_ALWAYS_INLINE bool read_bin(csubstr s, I *C4_RESTRICT v)
+{
+    C4_STATIC_ASSERT(std::is_integral<I>::value);
+    *v = 0;
+    for(char c : s)
+    {
+        *v <<= 1;
+        if(c == '1') *v |= 1;
+        else if(c == '0') ;
+        else return false;
+    }
+    return true;
+}
+
+template<class I>
 C4_ALWAYS_INLINE bool read_oct(csubstr s, I *C4_RESTRICT v)
 {
     C4_STATIC_ASSERT(std::is_integral<I>::value);
     *v = 0;
     for(char c : s)
     {
-        if(c < '0' || c > '7') return false;
+        if(C4_UNLIKELY(c < '0' || c > '7')) return false;
         *v = (*v) * I(8) + (I(c) - I('0'));
     }
     return true;
@@ -323,9 +338,10 @@ C4_ALWAYS_INLINE bool read_oct(csubstr s, I *C4_RESTRICT v)
 
 
 /** Convert a trimmed string to a signed integral value. The value can be
- * formatted as decimal, binary (prefix 0b), octal (prefix 0)
- * or hexadecimal (prefix 0x). Every character in the input string is read
- * for the conversion; it must not contain any leading or trailing whitespace.
+ * formatted as decimal, binary (prefix 0b or 0B), octal (prefix 0o or 0O) or
+ * hexadecimal (prefix 0x or 0X). Every character in the input string is read
+ * for the conversion; it must not contain any leading or trailing
+ * whitespace.
  * @return true if the conversion was successful.
  * @see atoi_first() if the string is not trimmed to the value to read.
  * @ingroup lowlevel_tofrom_chars
@@ -335,7 +351,6 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
 {
     C4_STATIC_ASSERT(std::is_integral<T>::value);
     C4_STATIC_ASSERT(std::is_signed<T>::value);
-
     C4_ASSERT(str.len > 0);
     C4_ASSERT(str == str.first_int_span());
 
@@ -359,15 +374,28 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
             *v = 0; // because the first character is 0
             return true;
         }
-        else if(str.str[start+1] == 'x' || str.str[start+1] == 'X') // hexadecimal
+        else
         {
-            C4_ASSERT(str.len > 2);
-             if(C4_UNLIKELY( ! detail::read_hex(str.sub(start + 2), v))) return false;
-        }
-        else // octal
-        {
-            C4_ASSERT(str.len > 1);
-            if(C4_UNLIKELY( ! detail::read_oct(str.sub(start), v))) return false;
+            char pfx = str.str[start+1];
+            if(pfx == 'x' || pfx == 'X') // hexadecimal
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_hex(str.sub(start + 2), v))) return false;
+            }
+            else if(pfx == 'b' || pfx == 'B') // binary
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_bin(str.sub(start + 2), v))) return false;
+            }
+            else if(pfx == 'o' || pfx == 'O') // octal
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_oct(str.sub(start + 2), v))) return false;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
 
@@ -398,8 +426,8 @@ inline size_t atoi_first(csubstr str, T * C4_RESTRICT v)
 //-----------------------------------------------------------------------------
 
 /** Convert a trimmed string to an unsigned integral value. The value can be
- * formatted as decimal, binary (prefix 0b), octal (prefix 0)
- * or hexadecimal (prefix 0x). Every character in the input string is read
+ * formatted as decimal, binary (prefix 0b or 0B), octal (prefix 0o or 0O)
+ * or hexadecimal (prefix 0x or 0X). Every character in the input string is read
  * for the conversion; it must not contain any leading or trailing whitespace.
  * @return true if the conversion was successful.
  * @see atou_first() if the string is not trimmed to the value to read.
@@ -412,6 +440,7 @@ bool atou(csubstr str, T * C4_RESTRICT v)
     C4_ASSERT(str.len > 0);
     C4_ASSERT_MSG(str.str[0] != '-', "must be positive");
     C4_ASSERT(str == str.first_uint_span());
+
     if(str.str[0] != '0')
     {
         if(C4_UNLIKELY( ! detail::read_dec(str, v))) return false;
@@ -423,15 +452,28 @@ bool atou(csubstr str, T * C4_RESTRICT v)
             *v = 0; // because the first character is 0
             return true;
         }
-        else if(str.str[1] == 'x' || str.str[1] == 'X') // hexadecimal
+        else
         {
-            C4_ASSERT(str.len > 2);
-            if(C4_UNLIKELY( ! detail::read_hex(str.sub(2), v))) return false;
-        }
-        else // octal
-        {
-            C4_ASSERT(str.len > 1);
-            if(C4_UNLIKELY( ! detail::read_oct(str.sub(1), v))) return false;
+            char pfx = str.str[1];
+            if(pfx == 'x' || pfx == 'X') // hexadecimal
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_hex(str.sub(2), v))) return false;
+            }
+            else if(pfx == 'b' || pfx == 'B') // binary
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_bin(str.sub(2), v))) return false;
+            }
+            else if(pfx == 'o' || pfx == 'O') // octal
+            {
+                C4_ASSERT(str.len > 2);
+                if(C4_UNLIKELY( ! detail::read_oct(str.sub(2), v))) return false;
+            }
+            else
+            {
+                return false;
+            }
         }
     }
     return true;
