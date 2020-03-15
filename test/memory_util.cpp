@@ -134,47 +134,49 @@ TEST(lsb11, basic)
 
 TEST(msb, basic)
 {
-    EXPECT_EQ(msb( 0), 0);
-    EXPECT_EQ(msb( 1), 1);
-    EXPECT_EQ(msb( 2), 2);
-    EXPECT_EQ(msb( 3), 2);
-    EXPECT_EQ(msb( 4), 3);
-    EXPECT_EQ(msb( 5), 3);
-    EXPECT_EQ(msb( 6), 3);
-    EXPECT_EQ(msb( 7), 3);
-    EXPECT_EQ(msb( 8), 4);
-    EXPECT_EQ(msb( 9), 4);
-    EXPECT_EQ(msb(10), 4);
-    EXPECT_EQ(msb(11), 4);
-    EXPECT_EQ(msb(12), 4);
-    EXPECT_EQ(msb(13), 4);
-    EXPECT_EQ(msb(14), 4);
-    EXPECT_EQ(msb(15), 4);
-    EXPECT_EQ(msb(16), 5);
+    EXPECT_EQ(msb( 0), -1);
+    EXPECT_EQ(msb( 1),  0);
+    EXPECT_EQ(msb( 2),  1);
+    EXPECT_EQ(msb( 3),  1);
+    EXPECT_EQ(msb( 4),  2);
+    EXPECT_EQ(msb( 5),  2);
+    EXPECT_EQ(msb( 6),  2);
+    EXPECT_EQ(msb( 7),  2);
+    EXPECT_EQ(msb( 8),  3);
+    EXPECT_EQ(msb( 9),  3);
+    EXPECT_EQ(msb(10),  3);
+    EXPECT_EQ(msb(11),  3);
+    EXPECT_EQ(msb(12),  3);
+    EXPECT_EQ(msb(13),  3);
+    EXPECT_EQ(msb(14),  3);
+    EXPECT_EQ(msb(15),  3);
+    EXPECT_EQ(msb(16),  4);
 }
 
 TEST(msb11, basic)
 {
-    EXPECT_EQ((msb11<int, 0>::value), 0);
-    EXPECT_EQ((msb11<int, 1>::value), 1);
-    EXPECT_EQ((msb11<int, 2>::value), 2);
-    EXPECT_EQ((msb11<int, 3>::value), 2);
-    EXPECT_EQ((msb11<int, 4>::value), 3);
-    EXPECT_EQ((msb11<int, 5>::value), 3);
-    EXPECT_EQ((msb11<int, 6>::value), 3);
-    EXPECT_EQ((msb11<int, 7>::value), 3);
-    EXPECT_EQ((msb11<int, 8>::value), 4);
-    EXPECT_EQ((msb11<int, 9>::value), 4);
-    EXPECT_EQ((msb11<int,10>::value), 4);
-    EXPECT_EQ((msb11<int,11>::value), 4);
-    EXPECT_EQ((msb11<int,12>::value), 4);
-    EXPECT_EQ((msb11<int,13>::value), 4);
-    EXPECT_EQ((msb11<int,14>::value), 4);
-    EXPECT_EQ((msb11<int,15>::value), 4);
-    EXPECT_EQ((msb11<int,16>::value), 5);
+    EXPECT_EQ((msb11<int, 0>::value), -1);
+    EXPECT_EQ((msb11<int, 1>::value),  0);
+    EXPECT_EQ((msb11<int, 2>::value),  1);
+    EXPECT_EQ((msb11<int, 3>::value),  1);
+    EXPECT_EQ((msb11<int, 4>::value),  2);
+    EXPECT_EQ((msb11<int, 5>::value),  2);
+    EXPECT_EQ((msb11<int, 6>::value),  2);
+    EXPECT_EQ((msb11<int, 7>::value),  2);
+    EXPECT_EQ((msb11<int, 8>::value),  3);
+    EXPECT_EQ((msb11<int, 9>::value),  3);
+    EXPECT_EQ((msb11<int,10>::value),  3);
+    EXPECT_EQ((msb11<int,11>::value),  3);
+    EXPECT_EQ((msb11<int,12>::value),  3);
+    EXPECT_EQ((msb11<int,13>::value),  3);
+    EXPECT_EQ((msb11<int,14>::value),  3);
+    EXPECT_EQ((msb11<int,15>::value),  3);
+    EXPECT_EQ((msb11<int,16>::value),  4);
 }
 
+
 //-----------------------------------------------------------------------------
+// tight pair
 
 template<size_t N> struct sz    { char buf[N]; };
 template<        > struct sz<0> {              };
