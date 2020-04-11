@@ -524,7 +524,6 @@ TEST(ftoa, basic)
 using rfloat  = detail::real<float>;
 using rdouble = detail::real<double>;
 
-
 template<class T>
 std::string strbin(T val)
 {
@@ -546,9 +545,14 @@ std::string strbin(T val)
     return s;
 }
 
+void prf(double d)
+{
+    std::cout << strbin((float)d) << "\n";
+    std::cout << strbin(d) << "\n";
+}
+
 TEST(scan_one_real, sign_representation)
 {
-
     EXPECT_EQ(rfloat( 1.f).get_sign(), 0);
     EXPECT_EQ(rfloat(+1.f).get_sign(), 0);
     EXPECT_EQ(rfloat(-1.f).get_sign(), 1);
@@ -561,59 +565,62 @@ TEST(scan_one_real, sign_representation)
 TEST(scan_one_real, exponent_representation)
 {
     std::cout << formatrs<std::string>("exp: [{},{}[\n", rfloat::exp_start, rfloat::exp_end);
-    std::cout << formatrs<std::string>("frac: [{},{}[\n", rfloat::frac_start, rfloat::frac_end);
-    std::cout << strbin( 0.15625f) << "\n";
-    std::cout << strbin( 0.f) << "\n";
-    std::cout << strbin( 1.f) << "\n";
-    std::cout << strbin(-1.f) << "\n";
-    std::cout << strbin( 0.5f) << "\n";
-    std::cout << strbin( 2.f) << "\n";
-    std::cout << strbin(-2.f) << "\n";
-    std::cout << strbin( 0e1f) << "\n";
-    std::cout << strbin( 1e1f) << "\n";
-    std::cout << strbin( 2e1f) << "\n";
-    std::cout << strbin( 0e2f) << "\n";
-    std::cout << strbin( 1e2f) << "\n";
-    std::cout << strbin( 2e2f) << "\n";
-    std::cout << strbin( 0e3f) << "\n";
-    std::cout << strbin( 1e3f) << "\n";
-    std::cout << strbin( 2e3f) << "\n";
-    std::cout << strbin( 0e4f) << "\n";
-    std::cout << strbin( 1e4f) << "\n";
-    std::cout << strbin( 2e4f) << "\n";
-    std::cout << strbin( 0e5f) << "\n";
-    std::cout << strbin( 1e5f) << "\n";
-    std::cout << strbin( 2e5f) << "\n";
-    std::cout << strbin( 1e-1f) << "\n";
-    std::cout << strbin( 2e-1f) << "\n";
-    std::cout << strbin( 1e-2f) << "\n";
-    std::cout << strbin( 2e-2f) << "\n";
-    std::cout << strbin( 1e-3f) << "\n";
-    std::cout << strbin( 2e-3f) << "\n";
-    std::cout << strbin( 1e-4f) << "\n";
-    std::cout << strbin( 2e-4f) << "\n";
+    std::cout << formatrs<std::string>("mant: [{},{}[\n", rfloat::mant_start, rfloat::mant_end);
+    prf( 0.15625);
+    prf( 0.) ;
+    prf( 1.) ;
+    prf(-1.) ;
+    prf( 0.5);
+    prf( 2.) ;
+    prf(-2.) ;
+    prf( 0e1);
+    prf( 1e1);
+    prf( 2e1);
+    prf( 0e2);
+    prf( 1e2);
+    prf( 2e2);
+    prf( 0e3);
+    prf( 1e3);
+    prf( 2e3);
+    prf( 0e4);
+    prf( 1e4);
+    prf( 2e4);
+    prf( 0e5);
+    prf( 1e5);
+    prf( 2e5);
+    prf( 1e-1);
+    prf( 2e-1);
+    prf( 1e-2);
+    prf( 2e-2);
+    prf( 1e-3);
+    prf( 2e-3);
+    prf( 1e-4);
+    prf( 2e-4);
+    prf(12.375);
 
-    EXPECT_EQ(rfloat(0).get_exp(), 0);
-    EXPECT_EQ(rfloat(1).get_exp(), 127);
-    EXPECT_EQ(rfloat(1).get_exp_r(), 1.f);
-    EXPECT_EQ(rfloat(-1).get_exp(), 127);
-    EXPECT_EQ(rfloat(-1).get_exp_r(), 1.f);
+    EXPECT_EQ(rfloat::num_exp_bits, 8);
+    EXPECT_EQ(rdouble::num_exp_bits, 11);
+
+    EXPECT_EQ(rfloat::exp_bias, 127);
+    EXPECT_EQ(rdouble::exp_bias, 1023);
+
+    EXPECT_EQ(rfloat(0.f).get_exp(), 0);
+    EXPECT_EQ(rfloat(1.f).get_exp(), 127);
+    EXPECT_EQ(rfloat(1.f).get_exp_r(), 1.f);
+    EXPECT_EQ(rfloat(-1.f).get_exp(), 127);
+    EXPECT_EQ(rfloat(-1.f).get_exp_r(), 1.f);
     EXPECT_EQ(rfloat(1e1f).get_exp(), 130);
     EXPECT_EQ(rfloat(1e1f).get_exp_r(), 8.f);
     EXPECT_EQ(rfloat(0.15625f).get_exp(), 124);
-
-    auto zf = rfloat(0.f);
-    zf.set_exp(127);
-    EXPECT_EQ(zf.get_exp(), 127);
 }
 
 
-void test_scan_one_real(csubstr num, float fval, double dval, float eps)
+void test_scan_one_real_(csubstr num, float fval, double dval, float eps)
 {
     float f;
     size_t fret = detail::scan_one_real(num, &f);
-    EXPECT_EQ(fret, num.len);
-    EXPECT_NEAR(f, fval, eps);
+    EXPECT_EQ(fret, num.len) << fval;
+    EXPECT_NEAR(f, fval, eps) << fval;
     detail::real<float> fref(fval);
     detail::real<float> fcmp(f);
     EXPECT_EQ(fref.get_sign(), fcmp.get_sign());
@@ -621,8 +628,8 @@ void test_scan_one_real(csubstr num, float fval, double dval, float eps)
 
     double d;
     size_t dret = detail::scan_one_real(num, &d);
-    EXPECT_EQ(dret, num.len);
-    EXPECT_NEAR(d, dval, double(eps));
+    EXPECT_EQ(dret, num.len) << dval;
+    EXPECT_NEAR(d, dval, double(eps)) << dval;
     detail::real<double> dref(dval);
     detail::real<double> dcmp(d);
     EXPECT_EQ(dref.get_sign(), dcmp.get_sign());
@@ -640,72 +647,72 @@ TEST(scan_one_real, zeros)
     {                                                                   \
         SCOPED_TRACE(number " - exponent e0");                          \
         csubstr r = cat_sub(buf, number, "e0");                         \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E0");                          \
         csubstr r = cat_sub(buf, number, "E0");                         \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e1");                          \
         csubstr r = cat_sub(buf, number, "e1");                         \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E1");                          \
         csubstr r = cat_sub(buf, number, "E1");                         \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e-1");                         \
         csubstr r = cat_sub(buf, number, "e-1");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E-1");                         \
         csubstr r = cat_sub(buf, number, "E-1");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e+1");                         \
         csubstr r = cat_sub(buf, number, "e+1");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E+1");                         \
         csubstr r = cat_sub(buf, number, "E+1");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e10");                         \
         csubstr r = cat_sub(buf, number, "e10");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E10");                         \
         csubstr r = cat_sub(buf, number, "E10");                        \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e-10");                        \
         csubstr r = cat_sub(buf, number, "e-10");                       \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E-10");                        \
         csubstr r = cat_sub(buf, number, "E-10");                       \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent e+10");                        \
         csubstr r = cat_sub(buf, number, "e+10");                       \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
     {                                                                   \
         SCOPED_TRACE(number " - exponent E+10");                        \
         csubstr r = cat_sub(buf, number, "E+10");                       \
-        test_scan_one_real(r, float(expected), double(expected), eps);  \
+        test_scan_one_real_(r, float(expected), double(expected), eps); \
     }                                                                   \
 }
 
@@ -803,6 +810,46 @@ TEST(scan_one_real, zeros)
     ztest("+0000.0000", 0.0, 0.0);
 }
 
+#define test_scan_one_real(r, eps) \
+    test_scan_one_real_(#r, float(r), double(r), eps)
+
+TEST(scan_one_real, basic)
+{
+    //prf(8388612.);
+    //prf(8388611.);
+    //prf(8388610.);
+    //prf(8388609.);
+    //prf(8388608.);
+    //prf(8388607.);
+    //prf(-8388607.);
+    //prf(8388605.);
+    //prf(8388606.);
+    //prf(0.);
+    //prf(1.);
+    //prf(12.375);
+    //prf(-12.375);
+    //prf(0.375);
+    //prf(-0.375);
+    //prf(1.375);
+    //prf(-1.375);
+
+    test_scan_one_real(8388607, 0.0);
+    test_scan_one_real(-8388607, 0.0);
+    test_scan_one_real(1, 0.0);
+    test_scan_one_real(-1, 0.0);
+    test_scan_one_real(2, 0.0);
+    test_scan_one_real(-2, 0.0);
+    test_scan_one_real(4, 0.0);
+    test_scan_one_real(-4, 0.0);
+    test_scan_one_real(12.375, 0.0);
+    test_scan_one_real(-12.375, 0.0);
+    test_scan_one_real(0.375, 0.0);
+    test_scan_one_real(-0.375, 0.0);
+    test_scan_one_real(0.5, 0.0);
+    test_scan_one_real(0.1, 0.0);
+    test_scan_one_real(0.01, 0.0);
+}
+
 TEST(scan_one_real, exact_integers_float)
 {
     char buf_[128];
@@ -814,17 +861,13 @@ TEST(scan_one_real, exact_integers_float)
         csubstr s = cat_sub(buf_, i);
         size_t sz = detail::scan_one_real(s, &result);
         EXPECT_EQ(sz, s.len);
-        EXPECT_EQ(result, float(i));
+        EXPECT_EQ(result, float(i)) << i;
+        if(!(i%1000)) std::cout<<i<<"\n";
         //
         // try several combinations:
         // eg: 16777216, 0.16777216e8, 1.6777216e7, 16.777216e6, 167.77216e7
         // ....16777216e0, 167772160e-1, 1677721600e-2, 16777216000e-3
     }
-}
-
-TEST(scan_one_real, hexadecimal)
-{
-
 }
 
 
