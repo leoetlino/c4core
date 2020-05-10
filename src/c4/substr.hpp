@@ -2,6 +2,7 @@
 #define _C4_SUBSTR_HPP_
 
 #include <string.h>
+#include <ctype.h>
 #include <type_traits>
 
 #include "c4/config.hpp"
@@ -71,11 +72,11 @@ public:
 
 public:
 
-    using  CC = typename std::add_const<C>::type;    //!< CC=const char
-    using NCC = typename std::remove_const<C>::type; //!< NCC=non const char
+    using  CC  = typename std::add_const<C>::type;     //!< CC=const char
+    using NCC_ = typename std::remove_const<C>::type; //!< NCC_=non const char
 
     using ro_substr = basic_substring<CC>;
-    using rw_substr = basic_substring<NCC>;
+    using rw_substr = basic_substring<NCC_>;
 
     using char_type = C;
     using size_type = size_t;
@@ -135,21 +136,21 @@ public:
     // when the char type is const, allow construction and assignment from non-const chars
 
     /** only available when the char type is const */
-    template<size_t N, class U=NCC> explicit basic_substring(C4_NC2C(U) (&s_)[N]) { str = s_; len = N-1; }
+    template<size_t N, class U=NCC_> explicit basic_substring(C4_NC2C(U) (&s_)[N]) { str = s_; len = N-1; }
     /** only available when the char type is const */
-    template<          class U=NCC>          basic_substring(C4_NC2C(U) *s_, size_t len_) { str = s_; len = len_; }
+    template<          class U=NCC_>          basic_substring(C4_NC2C(U) *s_, size_t len_) { str = s_; len = len_; }
     /** only available when the char type is const */
-    template<          class U=NCC>          basic_substring(C4_NC2C(U) *beg_, C4_NC2C(U) *end_) { C4_ASSERT(end_ >= beg_); str = beg_; len = end_ - beg_;  }
+    template<          class U=NCC_>          basic_substring(C4_NC2C(U) *beg_, C4_NC2C(U) *end_) { C4_ASSERT(end_ >= beg_); str = beg_; len = end_ - beg_;  }
 
     /** only available when the char type is const */
-    template<size_t N, class U=NCC> void assign(C4_NC2C(U) (&s_)[N]) { str = s_; len = N-1; }
+    template<size_t N, class U=NCC_> void assign(C4_NC2C(U) (&s_)[N]) { str = s_; len = N-1; }
     /** only available when the char type is const */
-    template<          class U=NCC> void assign(C4_NC2C(U) *s_, size_t len_) { str = s_; len = len_; }
+    template<          class U=NCC_> void assign(C4_NC2C(U) *s_, size_t len_) { str = s_; len = len_; }
     /** only available when the char type is const */
-    template<          class U=NCC> void assign(C4_NC2C(U) *beg_, C4_NC2C(U) *end_) { C4_ASSERT(end_ >= beg_); str = beg_; len = end_ - beg_;  }
+    template<          class U=NCC_> void assign(C4_NC2C(U) *beg_, C4_NC2C(U) *end_) { C4_ASSERT(end_ >= beg_); str = beg_; len = end_ - beg_;  }
 
     /** only available when the char type is const */
-    template<size_t N, class U=NCC>
+    template<size_t N, class U=NCC_>
     basic_substring& operator=(C4_NC2C(U) (&s_)[N]) { str = s_; len = N-1; return *this; }
 
 public:
@@ -411,17 +412,17 @@ public:
     {
         return first_of(c, start_pos);
     }
-    inline size_t find(ro_substr chars, size_t start_pos=0) const
+    inline size_t find(ro_substr pattern, size_t start_pos=0) const
     {
         C4_ASSERT(start_pos == npos || (start_pos >= 0 && start_pos <= len));
-        if(len < chars.len) return npos;
-        for(size_t i = start_pos, e = len - chars.len + 1; i < e; ++i)
+        if(len < pattern.len) return npos;
+        for(size_t i = start_pos, e = len - pattern.len + 1; i < e; ++i)
         {
             bool gotit = true;
-            for(size_t j = 0; j < chars.len; ++j)
+            for(size_t j = 0; j < pattern.len; ++j)
             {
                 C4_ASSERT(i + j < len);
-                if(str[i + j] != chars.str[j])
+                if(str[i + j] != pattern.str[j])
                 {
                     gotit = false;
                     break;
@@ -765,6 +766,19 @@ public:
         return basic_substring();
     }
 
+    basic_substring unquoted() const
+    {
+        constexpr const C dq('"'), sq('\'');
+        if(len >= 2 && (str[len - 2] != C('\\')) &&
+           ((begins_with(sq) && ends_with(sq))
+            ||
+            (begins_with(dq) && ends_with(dq))))
+        {
+            return range(1, len -1);
+        }
+        return *this;
+    }
+
 public:
 
     /** @return true if the substring contents are a floating-point or integer number */
@@ -828,6 +842,19 @@ public:
             for(size_t i = skip_start; i < len; ++i)
             {
                 if( ! _is_hex_char(str[i]))
+                {
+                    return _is_delim_char(str[i]) ? first(i) : first(0);
+                }
+            }
+        }
+        else if(first_of_any("0o", "0O")) // octal
+        {
+            skip_start += 2;
+            if(len == skip_start) return first(0);
+            for(size_t i = skip_start; i < len; ++i)
+            {
+                char c = str[i];
+                if(c < '0' || c > '7')
                 {
                     return _is_delim_char(str[i]) ? first(i) : first(0);
                 }
@@ -978,7 +1005,7 @@ private:
             split_proxy_impl const* m_proxy;
             basic_substring m_str;
             size_t m_pos;
-            NCC m_sep;
+            NCC_ m_sep;
 
             split_iterator_impl(split_proxy_impl const* proxy, size_t pos, C sep)
                 : m_proxy(proxy), m_pos(pos), m_sep(sep)
@@ -1058,6 +1085,16 @@ public:
         auto ss = basename(sep);
         ss = ss.empty() ? *this : left_of(ss);
         return ss;
+    }
+
+    C4_ALWAYS_INLINE basic_substring name_wo_extshort() const
+    {
+        return gpop_left('.');
+    }
+
+    C4_ALWAYS_INLINE basic_substring name_wo_extlong() const
+    {
+        return pop_left('.');
     }
 
     C4_ALWAYS_INLINE basic_substring extshort() const
@@ -1228,7 +1265,8 @@ public:
 
 public:
 
-    /** @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    /** set the current substring to a copy of the given csubstr
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
     C4_REQUIRE_RW(void) copy_from(ro_substr that, size_t ifirst=0, size_t num=npos)
     {
         C4_ASSERT(ifirst >= 0 && ifirst <= len);
@@ -1240,14 +1278,16 @@ public:
 
 public:
 
-    /** @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    /** reverse in place
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
     C4_REQUIRE_RW(void) reverse()
     {
         if(len == 0) return;
         _do_reverse(str, str + len - 1);
     }
 
-    /** @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    /** revert a subpart in place
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
     C4_REQUIRE_RW(void) reverse_sub(size_t ifirst, size_t num)
     {
         C4_ASSERT(ifirst >= 0 && ifirst <= len);
@@ -1256,7 +1296,8 @@ public:
         _do_reverse(str + ifirst, ifirst + num - 1);
     }
 
-    /** @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    /** revert a range in place
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
     C4_REQUIRE_RW(void) reverse_range(size_t ifirst, size_t ilast)
     {
         C4_ASSERT(ifirst >= 0 && ifirst <= len);
@@ -1267,7 +1308,9 @@ public:
 
 public:
 
-    /** @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    /** erase part of the string. eg, with char s[] = "0123456789",
+     * substr(s).erase(3, 2) = "01256789", and s is now "01245678989"
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
     C4_REQUIRE_RW(basic_substring) erase(size_t pos, size_t num)
     {
         C4_ASSERT(pos >= 0 && pos+num <= len);
@@ -1294,13 +1337,28 @@ public:
 public:
 
     /** replace every occurrence of character @p value with the character @p repl
-     *
+     * @return the number of characters that were replaced
      * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
-    C4_REQUIRE_RW(size_t) replace_all(C value, C repl, size_t pos=0)
+    C4_REQUIRE_RW(size_t) replace(C value, C repl, size_t pos=0)
     {
         C4_ASSERT((pos >= 0 && pos < len) || pos == npos);
         size_t did_it = 0;
         while((pos = find(value, pos)) != npos)
+        {
+            str[pos++] = repl;
+            ++did_it;
+        }
+        return did_it;
+    }
+
+    /** replace every occurrence of character @p value with the character @p repl
+     * @return the number of characters that were replaced
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    C4_REQUIRE_RW(size_t) replace(ro_substr chars, C repl, size_t pos=0)
+    {
+        C4_ASSERT((pos >= 0 && pos < len) || pos == npos);
+        size_t did_it = 0;
+        while((pos = first_of(chars, pos)) != npos)
         {
             str[pos++] = repl;
             ++did_it;
@@ -1349,6 +1407,38 @@ public:
         } while(b < len && b != npos);
         return sz;
 #undef _c4append
+    }
+
+public:
+
+    /** convert the string to upper-case
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    C4_REQUIRE_RW(void) toupper()
+    {
+        for(size_t i = 0; i < len; ++i)
+        {
+            str[i] = static_cast<C>(::toupper(str[i]));
+        }
+    }
+
+    /** convert the string to lower-case
+     * @note this method requires that the string memory is writeable and is SFINAEd out for const C */
+    C4_REQUIRE_RW(void) tolower()
+    {
+        for(size_t i = 0; i < len; ++i)
+        {
+            str[i] = static_cast<C>(::tolower(str[i]));
+        }
+    }
+
+public:
+
+    C4_REQUIRE_RW(void) fill(C val)
+    {
+        for(size_t i = 0; i < len; ++i)
+        {
+            str[i] = val;
+        }
     }
 
 }; // template class basic_substring

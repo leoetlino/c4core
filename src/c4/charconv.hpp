@@ -10,23 +10,46 @@
 #include <climits>
 #include <limits>
 #include <utility>
-#if (C4_CPP >= 17) && __has_include(<charconv>) && __cpp_lib_to_chars
-#   define C4CORE_HAVE_STD_TOCHARS 1
-#   include <charconv>
+
+#if (C4_CPP >= 17)
+#   if defined(_MSC_VER)
+#       if (C4_MSVC_VERSION >= C4_MSVC_VERSION_2019)
+#           define C4CORE_HAVE_STD_TOCHARS 1
+#           include <charconv>
+#       else
+#           define C4CORE_HAVE_STD_TOCHARS 0
+#       endif
+#   else
+#       // VS2017 and lower do not have these macros
+#       if __has_include(<charconv>) && __cpp_lib_to_chars
+#           define C4CORE_HAVE_STD_TOCHARS 1
+#           include <charconv>
+#       else
+#           define C4CORE_HAVE_STD_TOCHARS 0
+#       endif
+#   endif
 #else
 #   define C4CORE_HAVE_STD_TOCHARS 0
 #endif
 
 #include "c4/config.hpp"
 #include "c4/substr.hpp"
+#include "c4/memory_util.hpp"
 
 #ifdef _MSC_VER
 #   pragma warning(push)
 #   pragma warning(disable: 4800) //'int': forcing value to bool 'true' or 'false' (performance warning)
 #   pragma warning(disable: 4996) // snprintf/scanf: this function or variable may be unsafe
+#elif defined(__clang__)
+#   pragma clang diagnostic push
+#   pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#elif defined(__GNUC__)
+#   pragma GCC diagnostic push
 #endif
 
 namespace c4 {
+
+/** @file charconv.hpp Low-level conversion functions to/from strings */
 
 /** @defgroup formatting Formatting functions */
 
@@ -203,7 +226,8 @@ size_t itoa(substr buf, T v, T radix)
     } while(v);
     if(buf.len)
     {
-        buf.reverse_range(pfx, pos <= buf.len ? pos : buf.len);
+        buf.reverse_range(pfx <= buf.len ? pfx : buf.len,
+                          pos <= buf.len ? pos : buf.len);
     }
 
     return pos;
@@ -261,7 +285,8 @@ size_t utoa(substr buf, T v, T radix)
     } while(v);
     if(buf.len)
     {
-        buf.reverse_range(pfx, pos <= buf.len ? pos : buf.len);
+        buf.reverse_range(pfx <= buf.len ? pfx : buf.len,
+                          pos <= buf.len ? pos : buf.len);
     }
 
     return pos;
@@ -369,7 +394,7 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
     else
     {
         C4_ASSERT(str.len > start);
-        if(str.len == start+1)
+        if(str.len == start+1 || str.first_not_of('0', start) == csubstr::npos)
         {
             *v = 0; // because the first character is 0
             return true;
@@ -379,28 +404,26 @@ bool atoi(csubstr str, T * C4_RESTRICT v)
             char pfx = str.str[start+1];
             if(pfx == 'x' || pfx == 'X') // hexadecimal
             {
-                C4_ASSERT(str.len > 2);
+                C4_ASSERT(str.len > start + 2);
                 if(C4_UNLIKELY( ! detail::read_hex(str.sub(start + 2), v))) return false;
             }
             else if(pfx == 'b' || pfx == 'B') // binary
             {
-                C4_ASSERT(str.len > 2);
+                C4_ASSERT(str.len > start + 2);
                 if(C4_UNLIKELY( ! detail::read_bin(str.sub(start + 2), v))) return false;
             }
             else if(pfx == 'o' || pfx == 'O') // octal
             {
-                C4_ASSERT(str.len > 2);
+                C4_ASSERT(str.len > start + 2);
                 if(C4_UNLIKELY( ! detail::read_oct(str.sub(start + 2), v))) return false;
             }
             else
             {
-                return false;
+                if(C4_UNLIKELY( ! detail::read_dec(str.sub(start), v))) return false;
             }
         }
     }
-
     *v *= sign;
-
     return true;
 }
 
@@ -443,11 +466,11 @@ bool atou(csubstr str, T * C4_RESTRICT v)
 
     if(str.str[0] != '0')
     {
-        if(C4_UNLIKELY( ! detail::read_dec(str, v))) return false;
+        return detail::read_dec(str, v);
     }
     else
     {
-        if(str.len == 1)
+        if(str.len == 1 || str.first_not_of('0') == csubstr::npos)
         {
             *v = 0; // because the first character is 0
             return true;
@@ -458,25 +481,21 @@ bool atou(csubstr str, T * C4_RESTRICT v)
             if(pfx == 'x' || pfx == 'X') // hexadecimal
             {
                 C4_ASSERT(str.len > 2);
-                if(C4_UNLIKELY( ! detail::read_hex(str.sub(2), v))) return false;
+                return detail::read_hex(str.sub(2), v);
             }
             else if(pfx == 'b' || pfx == 'B') // binary
             {
                 C4_ASSERT(str.len > 2);
-                if(C4_UNLIKELY( ! detail::read_bin(str.sub(2), v))) return false;
+                return detail::read_bin(str.sub(2), v);
             }
             else if(pfx == 'o' || pfx == 'O') // octal
             {
                 C4_ASSERT(str.len > 2);
-                if(C4_UNLIKELY( ! detail::read_oct(str.sub(2), v))) return false;
-            }
-            else
-            {
-                return false;
+                return detail::read_oct(str.sub(2), v);
             }
         }
     }
-    return true;
+    return detail::read_dec(str, v);
 }
 
 
@@ -595,10 +614,10 @@ struct real
     {
         T out = 1, exp = 1;
         utype mant = get_mant();
-        for(int i = 0; i < num_mant_bits; ++i)
+        for(int i = 0; i < num_frac_bits; ++i)
         {
             exp /= T(2);
-            out += ((mant >> (num_mant_bits - i)) & one) * exp;
+            out += ((mant >> (num_frac_bits - i)) & one) * exp;
         }
         return out;
     }
@@ -607,8 +626,8 @@ struct real
     C4_ALWAYS_INLINE void  set_sign() { buf |= sign_mask; } //!< to negative
     C4_ALWAYS_INLINE utype get_sign() const { return (buf & sign_mask) >> sign_bit; }
 
-    C4_ALWAYS_INLINE void  clr_mant() { buf &= ~mant_mask; }
-    C4_ALWAYS_INLINE utype get_mant() const { return (buf & mant_mask) >> mant_start; }
+    C4_ALWAYS_INLINE void  clr_mant() { buf &= ~frac_mask; }
+    C4_ALWAYS_INLINE utype get_mant() const { return (buf & frac_mask) >> frac_start; }
 
     C4_ALWAYS_INLINE void  clr_exp() { buf &= ~exp_mask; }
     C4_ALWAYS_INLINE utype get_exp()  const { return (buf & exp_mask) >> exp_start; }
@@ -619,7 +638,8 @@ struct real
         buf |= (f << exp_start) & exp_mask;
     }
 
-    /** @p exponent is the base-10 exponent */
+#ifdef WIP
+   /** @p exponent is the base-10 exponent */
     C4_ALWAYS_INLINE T setfrom10(utype integral, utype num_frac_zeros, utype fractional, stype exponent)
     {
         utype mantissa;
@@ -635,19 +655,19 @@ struct real
             C4_ASSERT(fractional);
         }
         utype mantissa = (integral & ~(one << b)); // truncate the MSB out of the mantissa
-        if(C4_UNLIKELY(b > num_mant_bits))
+        if(C4_UNLIKELY(b > num_frac_bits))
         {
             // shift to make the truncated mantissa start at the left of its bit range
-            mantissa >>= (b - num_mant_bits);
+            mantissa >>= (b - num_frac_bits);
         }
         else
         {
             // shift to make the truncated mantissa start at the left of its bit range
-            mantissa <<= (mant_end - b);
+            mantissa <<= (frac_end - b);
             if(fractional)
             {
-                C4_ASSERT(mant_end >= b+1);
-                b = mant_end - b - 1;
+                C4_ASSERT(frac_end >= b+1);
+                b = frac_end - b - 1;
                 T fr = as_frac(num_frac_zeros, fractional);
                 exponent += integral ? stype(0) : -(stype)msb(fr);
                 while((fr != T(0)) && (b != utype(-1)))
@@ -662,9 +682,10 @@ struct real
         }
         set_exp(exponent);
         // TODO defend against overflow
-        buf |= ((mantissa << mant_start) & mant_mask);
+        buf |= ((mantissa << frac_start) & frac_mask);
         return get();
     }
+#endif //WIP
 
     /** quick'n'dirty */
     C4_ALWAYS_INLINE static T setfrom10qnd(utype integral, utype num_frac_zeros, utype fractional, stype exponent)
@@ -711,36 +732,25 @@ struct real
 
     //------------------------------------
 
-    constexpr static inline int get_exponent_bits()
+    constexpr static inline int get_exponent_bits() noexcept
     {
         using nl = std::numeric_limits<T>;
-        int range = nl::max_exponent - nl::min_exponent;
-        int bits = 0;
-        while ((range >> bits) > 0) ++bits;
-        return bits;
-    }
-
-    constexpr static inline utype get_mask(int start, int end)
-    {
-        utype r = 0;
-        constexpr const utype o = 1;
-        for(int i = start; i < end; ++i) r |= (o << i);
-        return r;
+        return 1 + msb11<int, nl::max_exponent - nl::min_exponent>::value;
     }
 
     enum : int {
         num_bits  = sizeof(T) * CHAR_BIT,
-        num_mant_bits = std::numeric_limits<T>::digits - 1,
+        num_frac_bits = std::numeric_limits<T>::digits - 1,
         num_exp_bits = get_exponent_bits(),
-        mant_start = 0, mant_end = num_mant_bits,
-        exp_start = mant_end, exp_end = exp_start + num_exp_bits,
+        frac_start = 0, frac_end = num_frac_bits,
+        exp_start = frac_end, exp_end = exp_start + num_exp_bits,
         sign_bit = num_bits - 1,
     };
     enum : utype {
         one = 1,
         sign_mask = one << sign_bit,
-        mant_mask = get_mask(mant_start, mant_end),
-        exp_mask = get_mask(exp_start, exp_end),
+        frac_mask = contiguous_mask11<stype, frac_start, frac_end>::value,
+        exp_mask = contiguous_mask11<stype, exp_start, exp_end>::value,
         exp_bias = ((one << (num_exp_bits - 1)) - one),
     };
 };
@@ -1183,6 +1193,10 @@ _C4_DEFINE_TO_FROM_CHARS_TOA(uint16_t, u)
 _C4_DEFINE_TO_FROM_CHARS_TOA(uint32_t, u)
 _C4_DEFINE_TO_FROM_CHARS_TOA(uint64_t, u)
 
+#ifdef C4_IOS
+_C4_DEFINE_TO_FROM_CHARS_TOA(size_t, u)
+#endif
+
 #undef _C4_DEFINE_TO_FROM_CHARS
 #undef _C4_DEFINE_TO_FROM_CHARS_TOA
 
@@ -1349,6 +1363,10 @@ inline size_t to_chars(substr buf, const char * C4_RESTRICT v)
 
 #ifdef _MSC_VER
 #   pragma warning(pop)
+#elif defined(__clang__)
+#   pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#   pragma GCC diagnostic pop
 #endif
 
 #endif /* _C4_CHARCONV_HPP_ */

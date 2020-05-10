@@ -888,6 +888,21 @@ TEST(substr, pair_range_nested)
     EXPECT_EQ(csubstr("123{{{}}a{{}}b{{}}c{{}}}456").pair_range_nested('{', '}'), "{{{}}a{{}}b{{}}c{{}}}");
 }
 
+TEST(substr, unquoted)
+{
+    EXPECT_EQ(csubstr("").unquoted(), "");
+
+    EXPECT_EQ(csubstr("''").unquoted(), "");
+    EXPECT_EQ(csubstr("\"\"").unquoted(), "");
+
+    EXPECT_EQ(csubstr("'\''").unquoted(), "'");
+
+    EXPECT_EQ(csubstr("aa").unquoted(), "aa");
+    EXPECT_EQ(csubstr("'aa'").unquoted(), "aa");
+    EXPECT_EQ(csubstr("\"aa\"").unquoted(), "aa");
+    EXPECT_EQ(csubstr("'aa\''").unquoted(), "aa'");
+}
+
 
 TEST(substr, first_non_empty_span)
 {
@@ -2995,23 +3010,35 @@ TEST(substr, erase)
 
 
 //-----------------------------------------------------------------------------
-TEST(substr, replace_all)
+TEST(substr, replace)
 {
     char buf[] = "0.1.2.3.4.5.6.7.8.9";
 
     substr s = buf;
     bool ret;
 
-    ret = s.replace_all('+', '.');
+    ret = s.replace('+', '.');
     EXPECT_FALSE(ret);
 
-    ret = s.replace_all('.', '.');
+    ret = s.replace('.', '.');
     EXPECT_TRUE(ret);
     EXPECT_EQ(s, "0.1.2.3.4.5.6.7.8.9");
 
-    ret = s.replace_all('.', '+');
+    ret = s.replace('.', '+');
     EXPECT_TRUE(ret);
     EXPECT_EQ(s, "0+1+2+3+4+5+6+7+8+9");
+
+    ret = s.replace("16", '.');
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(s, "0+.+2+3+4+5+.+7+8+9");
+    ret = s.replace("3+2", '_');
+    EXPECT_TRUE(ret);
+    EXPECT_EQ(s, "0_._____4_5_._7_8_9");
+}
+
+TEST(substr, replace_all)
+{
+    char buf[] = "0.1.2.3.4.5.6.7.8.9";
 
     std::string tmp, out("0+1+2+3+4+5+6+7+8+9");
     substr r;
