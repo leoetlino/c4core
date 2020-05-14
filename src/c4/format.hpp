@@ -270,12 +270,12 @@ inline size_t from_chars(csubstr buf, fmt::raw_wrapper r)
 /** read a variable in raw binary format, using memcpy */
 inline size_t from_chars_first(csubstr buf, fmt::raw_wrapper *r)
 {
-    return from_chars_first(buf, r);
+    return from_chars(buf, r);
 }
 /** read a variable in raw binary format, using memcpy */
 inline size_t from_chars_first(csubstr buf, fmt::raw_wrapper r)
 {
-    return from_chars_first(buf, &r);
+    return from_chars(buf, &r);
 }
 
 
