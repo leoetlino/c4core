@@ -1014,7 +1014,7 @@ _C4_DEFINE_TO_FROM_CHARS_TOA(uint16_t, u)
 _C4_DEFINE_TO_FROM_CHARS_TOA(uint32_t, u)
 _C4_DEFINE_TO_FROM_CHARS_TOA(uint64_t, u)
 
-#ifdef C4_IOS
+#if defined(C4_IOS) || defined(C4_MACOS)
 _C4_DEFINE_TO_FROM_CHARS_TOA(size_t, u)
 #endif
 

@@ -83,7 +83,7 @@ template<> struct fmt_wrapper<uint16_t> : public integral<uint16_t> { using inte
 template<> struct fmt_wrapper<uint32_t> : public integral<uint32_t> { using integral<uint32_t>::integral; };
 template<> struct fmt_wrapper<uint64_t> : public integral<uint64_t> { using integral<uint64_t>::integral; };
 
-#ifdef C4_IOS
+#if defined(C4_IOS) || defined(C4_MACOS)
 template<> struct fmt_wrapper<size_t> : public integral<size_t> { using integral<size_t>::integral; };
 #endif
 
